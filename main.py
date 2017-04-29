@@ -136,7 +136,7 @@ def schedule(url,name):
 def schedule_period(url,name,thumbnail):
     items = []
     for period in ["today","tomorrow","yesterday","this_week","next_week","last_week"]:
-        icon = 'special://home/addons/plugin.video.bbc/resources/img/%s.png' % id
+        icon = 'special://home/addons/plugin.audio.bbc/resources/img/%s.png' % id
         URL = url.replace('today',period)
         items.append({
             'label' : "%s - %s" % (name,period.replace('_',' ').title()),
@@ -187,7 +187,7 @@ def schedules():
     ]
     items = []
     for id, name, url in channels:
-        icon = 'special://home/addons/plugin.video.bbc/resources/img/%s.png' % id
+        icon = 'special://home/addons/plugin.audio.bbc/resources/img/%s.png' % id
         items.append({
             'label' : name,
             'thumbnail' : icon,
@@ -207,7 +207,7 @@ def red_button():
             id = "sport_stream_%02d%s" % (i,suffix)
             name = "Red Button %02d%s" % (i,suffix)
             url='http://a.files.bbci.co.uk/media/live/manifesto/audio_video/webcast/hls/uk/%s/%s/%s.m3u8' % (device, provider, id)
-            icon = 'special://home/addons/plugin.video.bbc/resources/img/red_button.png'
+            icon = 'special://home/addons/plugin.audio.bbc/resources/img/red_button.png'
             if plugin.get_setting('autoplay') == 'true':
                 items.append({
                     'label' : name,
@@ -275,7 +275,7 @@ def make_playlist():
         url='http://a.files.bbci.co.uk/media/live/manifesto/audio_video/simulcast/hls/uk/%s/%s/%s.m3u8' % (device, provider, id)
         urls.append((name,url))
 
-    playlist = xbmcvfs.File('special://profile/addon_data/plugin.video.bbc/BBC.m3u8','wb')
+    playlist = xbmcvfs.File('special://profile/addon_data/plugin.audio.bbc/BBC.m3u8','wb')
     playlist.write('#EXTM3U\n')
     for name,url in urls:
         html = get(url)
@@ -443,7 +443,7 @@ def proxy_play_episode(url,name,thumbnail,action):
 
 @plugin.route('/start_pvr_service')
 def start_pvr_service():
-    xbmc.executebuiltin('XBMC.RunPlugin(plugin://plugin.video.bbc/pvr_service)')
+    xbmc.executebuiltin('XBMC.RunPlugin(plugin://plugin.audio.bbc/pvr_service)')
 
 @plugin.route('/pvr_service')
 def pvr_service():
@@ -537,8 +537,8 @@ def play_episode(url,name,thumbnail,action):
         if name in cached:
             return
     html = get(url)
-    log(url)
-    log(html)
+    #log(url)
+    #log(html)
     if not html:
         return
     vpid = ''
@@ -592,10 +592,10 @@ def play_episode(url,name,thumbnail,action):
             'path': URL,
             'thumbnail': thumbnail
         }
-        if subtitles and plugin.get_setting('subtitles') == 'true':
-            plugin.set_resolved_url(item,'special://profile/addon_data/plugin.video.bbc/subtitles.srt')
-        else:
-            plugin.set_resolved_url(item)
+        #if subtitles and plugin.get_setting('subtitles') == 'true':
+        #    plugin.set_resolved_url(item,'special://profile/addon_data/plugin.audio.bbc/subtitles.srt')
+        #else:
+        plugin.set_resolved_url(item)
 
     elif action == "list":
         items = []
@@ -615,6 +615,7 @@ def play_episode(url,name,thumbnail,action):
         BASE = re.compile('/[^/]*?$').sub('/',URL)
         #log(URL)
         html = get(URL)
+        #log(html)
         if not html:
             return
 
@@ -623,14 +624,14 @@ def play_episode(url,name,thumbnail,action):
             last = lines[-1]
             URL = BASE + last
             html = get(URL)
-
+        #log(html)
         lines = html.splitlines()
         if not URL.startswith('http'):
             return
         html = get(URL)
         lines = html.splitlines()
         basename = '%s%s' % (plugin.get_setting('cache'), re.sub('[\\/:]','',name))
-        xbmcvfs.copy('special://profile/addon_data/plugin.video.bbc/subtitles.srt',"%s.srt" % basename)
+        #xbmcvfs.copy('special://profile/addon_data/plugin.audio.bbc/subtitles.srt',"%s.srt" % basename)
         f = xbmcvfs.File("%s.ts" % basename,'wb')
         chunks = [x for x in lines if not x.startswith('#')]
         if plugin.get_setting('cache.progress') == 'true':
@@ -647,6 +648,7 @@ def play_episode(url,name,thumbnail,action):
         for chunk in chunks:
             if not chunk.startswith('http'):
                 chunk = BASE+chunk
+            #log(chunk)
             data = get(chunk)
             f.write(data)
             if progress:
@@ -727,7 +729,7 @@ def channel_a_z():
     ]
     items = []
     for id, img, name in channel_list:
-        icon = 'special://home/addons/plugin.video.bbc/resources/img/%s.png' % img
+        icon = 'special://home/addons/plugin.audio.bbc/resources/img/%s.png' % img
         url = "http://www.bbc.co.uk/%s/a-z" % id
         items.append({
             'label' : name,
@@ -741,7 +743,7 @@ def channel_a_z():
 @plugin.route('/page/<url>')
 def page(url):
     page_url = url
-    log(url)
+    #log(url)
     just_episodes=False
     """   Generic Radio page scraper.   """
 
@@ -857,11 +859,25 @@ def page(url):
 
                 url = "http://www.bbc.co.uk/programmes/%s" % programme_id
                 #CheckAutoplay(title, url, image, ' ', '')
+                if plugin.get_setting('autoplay') == 'true':
+                    autoplay = True
+                    action = "autoplay"
+                else:
+                    autoplay = False
+                    action = "list"
                 context_items = []
+                context_items.append(("[COLOR yellow][B]%s[/B][/COLOR] " % 'Add Favourite', 'XBMC.RunPlugin(%s)' %
+                (plugin.url_for(add_favourite, name=title, url=url, thumbnail=image, is_episode=True))))
+                context_items.append(("[COLOR yellow][B]%s[/B][/COLOR] " % 'Add to PVR', 'XBMC.RunPlugin(%s)' %
+                (plugin.url_for(add_pvr, name=title, url=url, thumbnail=image, is_episode=True))))
+                context_items.append(("[COLOR yellow][B]%s[/B][/COLOR] " % 'Cache', 'XBMC.RunPlugin(%s)' %
+                (plugin.url_for('play_episode',url=url,name=title,thumbnail=image,action="cache"))))
                 items.append({
                 'label': title,
-                'path': plugin.url_for('play_episode', url=url, name=title,thumbnail=image,action="list"),
+                'path': plugin.url_for('play_episode', url=url, name=title,thumbnail=image,action=action),
                 'thumbnail':image,
+                'is_playable' : autoplay,
+                'context_menu': context_items,
                 })
 
             percent = int(100*(page+list_item_num/len(programmes))/total_pages)
@@ -1103,7 +1119,7 @@ def live_mpd():
     ]
     items = []
     for id,name in channel_list:
-        icon = 'special://home/addons/plugin.video.bbc.live.mpd/resources/media/%s.png' % id
+        icon = 'special://home/addons/plugin.audio.bbc.live.mpd/resources/media/%s.png' % id
         path = 'http://a.files.bbci.co.uk/media/live/manifesto/audio_video/simulcast/dash/uk/dash_pc/ak/%s.mpd' % id
         item = ListItem(label=name,icon=icon,path=path)
         item.set_property('inputstreamaddon', 'inputstream.adaptive')
@@ -1158,17 +1174,17 @@ def index():
         'path': plugin.url_for('categories'),
         'thumbnail':get_icon_path('lists'),
     },
-    #{
-    #    'label': 'Favourites',
-    #    'path': plugin.url_for('favourites'),
-    #    'thumbnail':get_icon_path('favourites'),
-    #},
-    #{
-    #    'label': 'PVR',
-    #    'path': plugin.url_for('pvr_list'),
-    #    'thumbnail':get_icon_path('clock'),
-    #    'context_menu': context_items,
-    #},
+    {
+        'label': 'Favourites',
+        'path': plugin.url_for('favourites'),
+        'thumbnail':get_icon_path('favourites'),
+    },
+    {
+        'label': 'PVR',
+        'path': plugin.url_for('pvr_list'),
+        'thumbnail':get_icon_path('clock'),
+        'context_menu': context_items,
+    },
     #{
     #    'label': 'Make Live Playlist',
     #    'path': plugin.url_for('make_playlist'),

@@ -12,17 +12,17 @@ def Service():
         return
     servicing = True
     xbmc.log("SERVICE")
-    xbmc.executebuiltin('XBMC.RunPlugin(plugin://plugin.video.bbc/pvr_service)')
+    xbmc.executebuiltin('XBMC.RunPlugin(plugin://plugin.audio.bbc/pvr_service)')
     time.sleep(2)
     servicing = False
 
 if __name__ == '__main__':
-    ADDON = xbmcaddon.Addon('plugin.video.bbc')
+    ADDON = xbmcaddon.Addon('plugin.audio.bbc')
 
     try:
         if ADDON.getSetting('pvr.service') == 'true':
             monitor = xbmc.Monitor()
-            xbmc.log("[plugin.video.bbc] pvr service started...", xbmc.LOGDEBUG)
+            xbmc.log("[plugin.audio.bbc] pvr service started...", xbmc.LOGDEBUG)
             if ADDON.getSetting('pvr.startup') == 'true':
                 Service()
                 ADDON.setSetting('last.pvr.update', str(time.time()))
@@ -38,7 +38,7 @@ if __name__ == '__main__':
                     nextTime = lastTime + datetime.timedelta(seconds=waitTime)
                     td = nextTime - now
                     timeLeft = td.seconds + (td.days * 24 * 3600)
-                    xbmc.log("[plugin.video.bbc] Service waiting for interval %s" % waitTime, xbmc.LOGDEBUG)
+                    xbmc.log("[plugin.audio.bbc] Service waiting for interval %s" % waitTime, xbmc.LOGDEBUG)
                 elif ADDON.getSetting('pvr.type') == '2':
                     next_time = ADDON.getSetting('pvr.time')
                     if next_time:
@@ -51,10 +51,10 @@ if __name__ == '__main__':
                         timeLeft = td.seconds + (td.days * 24 * 3600)
                 if timeLeft <= 0:
                     timeLeft = 1
-                xbmc.log("[plugin.video.bbc] Service waiting for %d seconds" % timeLeft, xbmc.LOGDEBUG)
+                xbmc.log("[plugin.audio.bbc] Service waiting for %d seconds" % timeLeft, xbmc.LOGDEBUG)
                 if timeLeft and monitor.waitForAbort(timeLeft):
                     break
-                xbmc.log("[plugin.video.bbc] Service now triggered...", xbmc.LOGDEBUG)
+                xbmc.log("[plugin.audio.bbc] Service now triggered...", xbmc.LOGDEBUG)
                 Service()
                 now = time.time()
                 ADDON.setSetting('last.pvr.update', str(now))
