@@ -17,7 +17,7 @@ plugin = Plugin()
 big_list_view = False
 
 def log(v):
-    xbmc.log(repr(v))
+    xbmc.log(repr(v),xbmc.LOGERROR)
 
 def get_icon_path(icon_name):
     addon_path = xbmcaddon.Addon().getAddonInfo("path")
@@ -42,6 +42,7 @@ def unescape( str ):
     str = str.replace("&quot;","\"")
     str = str.replace("&amp;","&")
     str = str.replace("&#39;","'")
+    str = str.replace("&#039;","'")
     return str
 
 def get(url,proxy=False):
@@ -51,8 +52,9 @@ def get(url,proxy=False):
         url = 'http://www.justproxy.co.uk/index.php?q=%s' % base64.b64encode(url)
     #log(url)
     try:
-        #log(("GGG",url))
+        log(("GGG",url))
         r = requests.get(url,headers=headers,verify=False)
+        log(("RRR",r))
     except:
         return
     if r.status_code != requests.codes.ok:
@@ -739,11 +741,240 @@ def channel_a_z():
         })
     return items
 
+@plugin.route('/new_page/<url>')
+def new_page(url):
+    page_url = url
+    log(("NNN",url))
+    just_episodes=False
+    """   Generic Radio page scraper.   """
+
+    if plugin.get_setting('autoplay') == 'true':
+        autoplay = True
+        action = "autoplay"
+    else:
+        autoplay = False
+        action = "list"
+
+
+    pDialog = xbmcgui.DialogProgressBG()
+    pDialog.create("BBC Radio")
+
+    try:
+        html = get(page_url)
+    except:
+        log("XXX")
+    #log(("HHH",html))
+    items = []
+    total_pages = 1
+    current_page = 1
+    page_range = range(1)
+    paginate = re.search(r'<ol.+?class="pagination.*?</ol>',html)
+    next_page = 1
+    if paginate:
+        if plugin.get_setting('page') == "true":
+            current_page_match = re.search(r'page=(\d*)', page_url)
+            if current_page_match:
+                current_page = int(current_page_match.group(1))
+            page_range = range(current_page, current_page+1)
+            next_page_match = re.search(r'<li class="pagination__next"><a href="(.*?page=)(.*?)">', paginate.group(0))
+            if next_page_match:
+                page_base_url = next_page_match.group(1)
+                next_page = int(next_page_match.group(2))
+            else:
+                next_page = current_page
+            page_range = range(current_page, current_page+1)
+        else:
+            pages = re.findall(r'<li.+?class="pagination__page.*?</li>',paginate.group(0))
+            if pages:
+                last = pages[-1]
+                last_page = re.search(r'<a.+?href="(.*?=)(.*?)"',last)
+                page_base_url = last_page.group(1)
+                total_pages = int(last_page.group(2))
+            page_range = range(1, total_pages+1)
+
+    for page in page_range:
+
+        if page > current_page:
+            page_url = 'http://www.bbc.co.uk' + page_base_url + str(page)
+            html = get(page_url)
+
+
+        programme_items = html.split('class="programme-item ')
+        for programme_item in programme_items:
+            log(programme_item)
+
+            link = re.search('href="(/programmes/.+?)"',programme_item)
+            if link:
+                link = link.group(1)
+            log(link)
+
+            episodes = re.search('href="(/programmes/.+?/episodes)"',programme_item)
+            if episodes:
+                episodes = episodes.group(1)
+            log(episodes)
+
+            title = re.search('class="programme-item-title.+?>(.+?)<',programme_item)
+            if title:
+                title = unescape(title.group(1))
+            log(title)
+
+
+            subtitle = re.search('class="programme-item-subtitle.+?>(.+?)<',programme_item)
+            if subtitle:
+                subtitle = unescape(subtitle.group(1))
+            log(subtitle)
+
+            image = get_icon_path('live')
+            if link:
+                if not link.startswith('http'):
+                    link = "http://www.bbc.co.uk"+link
+                label = "%s - %s" % (title,subtitle)
+                items.append({
+                'label': label,
+                'path': plugin.url_for('play_episode', url=link, name=label,thumbnail=image,action=action),
+                'thumbnail':image,
+                'is_playable' : autoplay,
+                #'context_menu': context_items,
+                })
+            image = get_icon_path('folder')
+            if episodes:
+                if not episodes.startswith('http'):
+                    episodes = "http://www.bbc.co.uk"+episodes
+                path = plugin.url_for('page', url=episodes)
+                items.append({
+                'label': "[B]%s[/B]" % (title),
+                'path': path,
+                'thumbnail':image,
+                #'is_playable' : autoplay,
+                #'context_menu': context_items,
+                })
+        '''
+        masthead_title = ''
+        masthead_title_match = re.search(r'<div.+?id="programmes-main-content".*?<span property="name">(.+?)</span>', html)
+        if masthead_title_match:
+            masthead_title = masthead_title_match.group(1)
+
+        list_item_num = 1
+
+        programmes = html.split('<div class="programme ')
+        for programme in programmes:
+
+            if not programme.startswith("programme--radio"):
+                continue
+
+            if "available" not in programme: #TODO find a more robust test
+                continue
+
+            series_url = ''
+            series_id_match = re.search(r'<a class="iplayer-text js-lazylink__link" href="(/programmes/.+?/episodes/player)"', programme)
+            if series_id_match:
+                series_url = series_id_match.group(1)
+
+            programme_id = ''
+            programme_id_match = re.search(r'data-pid="(.+?)"', programme)
+            if programme_id_match:
+                programme_id = programme_id_match.group(1)
+
+            name = ''
+            name_match = re.search(r'<span property="name">(.+?)</span>', programme)
+            if name_match:
+                name = name_match.group(1)
+
+            subtitle = ''
+            subtitle_match = re.search(r'<span class="programme__subtitle.+?property="name">(.*?)</span>(.*?property="name">(.*?)</span>)?', programme)
+            if subtitle_match:
+                series = subtitle_match.group(1)
+                episode = subtitle_match.group(3)
+                if episode:
+                    subtitle = "(%s, %s)" % (series, episode)
+                else:
+                    if series.strip():
+                        subtitle = "(%s)" % series
+
+            image = ''
+            image_match = re.search(r'<meta property="image" content="(.+?)" />', programme)
+            if image_match:
+                image = image_match.group(1)
+
+            synopsis = ''
+            synopsis_match = re.search(r'<span property="description">(.+?)</span>', programme)
+            if synopsis_match:
+                synopsis = synopsis_match.group(1)
+
+            station = ''
+            station_match = re.search(r'<p class="programme__service.+?<strong>(.+?)</strong>.*?</p>', programme)
+            if station_match:
+                station = station_match.group(1).strip()
+
+            series_title = "[B]%s - %s[/B]" % (station, name)
+            if just_episodes:
+                title = "[B]%s[/B] - %s" % (masthead_title, name)
+            else:
+                title = "[B]%s[/B] - %s %s" % (station, name, subtitle)
+
+            if series_url:
+                #AddMenuEntry(series_title, series_url, 131, image, synopsis, '')
+                items.append({
+                'label': series_title,
+                'path': plugin.url_for('page', url="http://www.bbc.co.uk"+series_url),
+                'thumbnail':image,
+                })
+            elif programme_id: #TODO maybe they are not always mutually exclusive
+
+                url = "http://www.bbc.co.uk/programmes/%s" % programme_id
+                #CheckAutoplay(title, url, image, ' ', '')
+                if plugin.get_setting('autoplay') == 'true':
+                    autoplay = True
+                    action = "autoplay"
+                else:
+                    autoplay = False
+                    action = "list"
+                context_items = []
+                context_items.append(("[COLOR yellow][B]%s[/B][/COLOR] " % 'Add Favourite', 'XBMC.RunPlugin(%s)' %
+                (plugin.url_for(add_favourite, name=title, url=url, thumbnail=image, is_episode=True))))
+                context_items.append(("[COLOR yellow][B]%s[/B][/COLOR] " % 'Add to PVR', 'XBMC.RunPlugin(%s)' %
+                (plugin.url_for(add_pvr, name=title, url=url, thumbnail=image, is_episode=True))))
+                context_items.append(("[COLOR yellow][B]%s[/B][/COLOR] " % 'Cache', 'XBMC.RunPlugin(%s)' %
+                (plugin.url_for('play_episode',url=url,name=title,thumbnail=image,action="cache"))))
+                items.append({
+                'label': title,
+                'path': plugin.url_for('play_episode', url=url, name=title,thumbnail=image,action=action),
+                'thumbnail':image,
+                'is_playable' : autoplay,
+                'context_menu': context_items,
+                })
+
+            percent = int(100*(page+list_item_num/len(programmes))/total_pages)
+            pDialog.update(percent,name)
+
+            list_item_num += 1
+
+        percent = int(100*page/total_pages)
+        pDialog.update(percent,"BBC Radio")
+        '''
+
+    if plugin.get_setting('radio_paginate_episodes') == "true":
+        if current_page < next_page:
+            page_url = 'http://www.bbc.co.uk' + page_base_url + str(next_page)
+            #AddMenuEntry(" [COLOR ffffa500]%s >>[/COLOR]" % translation(30320), page_url, 136, '', '', '')
+            items.append({
+                'label': ">>",
+                'path': 'http://www.bbc.co.uk' + page_base_url + str(next_page),
+                'thumbnail':"",
+            })
+
+    #BUG: this should sort by original order but it doesn't (see http://trac.kodi.tv/ticket/10252)
+    #xbmcplugin.addSortMethod(int(sys.argv[1]), xbmcplugin.SORT_METHOD_UNSORTED)
+    #xbmcplugin.addSortMethod(int(sys.argv[1]), xbmcplugin.SORT_METHOD_VIDEO_TITLE)
+
+    pDialog.close()
+
+    return items
 
 @plugin.route('/page/<url>')
 def page(url):
     page_url = url
-    #log(url)
+    log(url)
     just_episodes=False
     """   Generic Radio page scraper.   """
 
@@ -907,8 +1138,6 @@ def page(url):
 
     return items
 
-
-
 @plugin.route('/add_pvr/<name>/<url>/<thumbnail>/<is_episode>')
 def add_pvr(name,url,thumbnail,is_episode):
     pvrs = plugin.get_storage('pvrs')
@@ -1056,28 +1285,45 @@ def pvr_list():
             })
     return items
 
-
 @plugin.route('/categories')
 def categories():
-    url = 'http://www.bbc.co.uk/radio/programmes/genres'
+    url = 'https://www.bbc.co.uk/radio/categories'
     headers = {'User-Agent':'Mozilla/5.0 (Windows NT 6.1; rv:50.0) Gecko/20100101 Firefox/50.0'}
     html = get(url)
-    #log(html)
-    #<a class="box-link" href="/radio/programmes/genres/sport/sailing">Sailing</a>
-    match = re.compile(
-        '<a class="box-link" href="(/radio/programmes/genres/.*?)">(.+?)</a>'
-        ).findall(html)
-    items = []
+
     if plugin.get_setting('categories') == '0':
         order = "atoz"
     else:
         order = "dateavailable"
-    for url, name in match:
-        #url = 'http://www.bbc.co.uk/iplayer/categories/%s/all?sort=%s' % (url,order)
-        url = 'http://www.bbc.co.uk%s/player/episodes' % (url)
+
+    match = re.compile(
+        'href="(/radio/categories/.+?)">(.+?)</a>'
+        ).findall(html)
+
+    categories = {}
+    for url, title in set(match):
+        base = url.split('/')[-1]
+        if '-' not in base:
+            categories[base] = title
+
+    items = []
+    for url, title in set(match):
+        base = url.split('/')[-1]
+        category = ''
+        if '-' in base:
+            category, name = base.split('-')
+            category = categories.get(category,category)
+            name = title
+            label = "%s - %s" % (category,name)
+        else:
+            category = title
+            name = ''
+            label = category
+
+        url = 'https://www.bbc.co.uk%s' % (url)
         items.append({
-            'label': "%s" % unescape(name),
-            'path': plugin.url_for('page',url=url),
+            'label': unescape(label),
+            'path': plugin.url_for('new_page',url=url),
             'thumbnail':get_icon_path('lists'),
         })
     items = sorted(items, key=lambda x: x["label"].lower())
