@@ -52,9 +52,9 @@ def get(url,proxy=False):
         url = 'http://www.justproxy.co.uk/index.php?q=%s' % base64.b64encode(url)
     #log(url)
     try:
-        log(("GGG",url))
+        #llog(("GGG",url))
         r = requests.get(url,headers=headers,verify=False)
-        log(("RRR",r))
+        #llog(("RRR",r))
     except:
         return
     if r.status_code != requests.codes.ok:
@@ -744,7 +744,7 @@ def channel_a_z():
 @plugin.route('/new_page/<url>')
 def new_page(url):
     page_url = url
-    log(("NNN",url))
+    #llog(("NNN",url))
     just_episodes=False
     """   Generic Radio page scraper.   """
 
@@ -762,7 +762,8 @@ def new_page(url):
     try:
         html = get(page_url)
     except:
-        log("XXX")
+        return
+        #llog("XXX")
     #log(("HHH",html))
     items = []
     total_pages = 1
@@ -801,28 +802,28 @@ def new_page(url):
 
         programme_items = html.split('class="programme-item ')
         for programme_item in programme_items:
-            log(programme_item)
+            #llog(programme_item)
 
             link = re.search('href="(/programmes/.+?)"',programme_item)
             if link:
                 link = link.group(1)
-            log(link)
+            #llog(link)
 
             episodes = re.search('href="(/programmes/.+?/episodes)"',programme_item)
             if episodes:
                 episodes = episodes.group(1)
-            log(episodes)
+            #llog(episodes)
 
             title = re.search('class="programme-item-title.+?>(.+?)<',programme_item)
             if title:
                 title = unescape(title.group(1))
-            log(title)
+            #llog(title)
 
 
             subtitle = re.search('class="programme-item-subtitle.+?>(.+?)<',programme_item)
             if subtitle:
                 subtitle = unescape(subtitle.group(1))
-            log(subtitle)
+            #llog(subtitle)
 
             image = get_icon_path('live')
             if link:
@@ -848,110 +849,7 @@ def new_page(url):
                 #'is_playable' : autoplay,
                 #'context_menu': context_items,
                 })
-        '''
-        masthead_title = ''
-        masthead_title_match = re.search(r'<div.+?id="programmes-main-content".*?<span property="name">(.+?)</span>', html)
-        if masthead_title_match:
-            masthead_title = masthead_title_match.group(1)
 
-        list_item_num = 1
-
-        programmes = html.split('<div class="programme ')
-        for programme in programmes:
-
-            if not programme.startswith("programme--radio"):
-                continue
-
-            if "available" not in programme: #TODO find a more robust test
-                continue
-
-            series_url = ''
-            series_id_match = re.search(r'<a class="iplayer-text js-lazylink__link" href="(/programmes/.+?/episodes/player)"', programme)
-            if series_id_match:
-                series_url = series_id_match.group(1)
-
-            programme_id = ''
-            programme_id_match = re.search(r'data-pid="(.+?)"', programme)
-            if programme_id_match:
-                programme_id = programme_id_match.group(1)
-
-            name = ''
-            name_match = re.search(r'<span property="name">(.+?)</span>', programme)
-            if name_match:
-                name = name_match.group(1)
-
-            subtitle = ''
-            subtitle_match = re.search(r'<span class="programme__subtitle.+?property="name">(.*?)</span>(.*?property="name">(.*?)</span>)?', programme)
-            if subtitle_match:
-                series = subtitle_match.group(1)
-                episode = subtitle_match.group(3)
-                if episode:
-                    subtitle = "(%s, %s)" % (series, episode)
-                else:
-                    if series.strip():
-                        subtitle = "(%s)" % series
-
-            image = ''
-            image_match = re.search(r'<meta property="image" content="(.+?)" />', programme)
-            if image_match:
-                image = image_match.group(1)
-
-            synopsis = ''
-            synopsis_match = re.search(r'<span property="description">(.+?)</span>', programme)
-            if synopsis_match:
-                synopsis = synopsis_match.group(1)
-
-            station = ''
-            station_match = re.search(r'<p class="programme__service.+?<strong>(.+?)</strong>.*?</p>', programme)
-            if station_match:
-                station = station_match.group(1).strip()
-
-            series_title = "[B]%s - %s[/B]" % (station, name)
-            if just_episodes:
-                title = "[B]%s[/B] - %s" % (masthead_title, name)
-            else:
-                title = "[B]%s[/B] - %s %s" % (station, name, subtitle)
-
-            if series_url:
-                #AddMenuEntry(series_title, series_url, 131, image, synopsis, '')
-                items.append({
-                'label': series_title,
-                'path': plugin.url_for('page', url="http://www.bbc.co.uk"+series_url),
-                'thumbnail':image,
-                })
-            elif programme_id: #TODO maybe they are not always mutually exclusive
-
-                url = "http://www.bbc.co.uk/programmes/%s" % programme_id
-                #CheckAutoplay(title, url, image, ' ', '')
-                if plugin.get_setting('autoplay') == 'true':
-                    autoplay = True
-                    action = "autoplay"
-                else:
-                    autoplay = False
-                    action = "list"
-                context_items = []
-                context_items.append(("[COLOR yellow][B]%s[/B][/COLOR] " % 'Add Favourite', 'XBMC.RunPlugin(%s)' %
-                (plugin.url_for(add_favourite, name=title, url=url, thumbnail=image, is_episode=True))))
-                context_items.append(("[COLOR yellow][B]%s[/B][/COLOR] " % 'Add to PVR', 'XBMC.RunPlugin(%s)' %
-                (plugin.url_for(add_pvr, name=title, url=url, thumbnail=image, is_episode=True))))
-                context_items.append(("[COLOR yellow][B]%s[/B][/COLOR] " % 'Cache', 'XBMC.RunPlugin(%s)' %
-                (plugin.url_for('play_episode',url=url,name=title,thumbnail=image,action="cache"))))
-                items.append({
-                'label': title,
-                'path': plugin.url_for('play_episode', url=url, name=title,thumbnail=image,action=action),
-                'thumbnail':image,
-                'is_playable' : autoplay,
-                'context_menu': context_items,
-                })
-
-            percent = int(100*(page+list_item_num/len(programmes))/total_pages)
-            pDialog.update(percent,name)
-
-            list_item_num += 1
-
-        percent = int(100*page/total_pages)
-        pDialog.update(percent,"BBC Radio")
-        '''
 
     if plugin.get_setting('radio_paginate_episodes') == "true":
         if current_page < next_page:
@@ -974,7 +872,7 @@ def new_page(url):
 @plugin.route('/page/<url>')
 def page(url):
     page_url = url
-    log(url)
+    #llog(url)
     just_episodes=False
     """   Generic Radio page scraper.   """
 
@@ -1016,11 +914,12 @@ def page(url):
             page_url = 'http://www.bbc.co.uk' + page_base_url + str(page)
             html = get(page_url)
 
+        #llog(html)
         masthead_title = ''
         masthead_title_match = re.search(r'<div.+?id="programmes-main-content".*?<span property="name">(.+?)</span>', html)
         if masthead_title_match:
             masthead_title = masthead_title_match.group(1)
-
+        #llog(("MMM",masthead_title))
         list_item_num = 1
 
         programmes = html.split('<div class="programme ')
@@ -1076,9 +975,10 @@ def page(url):
             series_title = "[B]%s - %s[/B]" % (station, name)
             if just_episodes:
                 title = "[B]%s[/B] - %s" % (masthead_title, name)
-            else:
+            elif station:
                 title = "[B]%s[/B] - %s %s" % (station, name, subtitle)
-
+            else:
+                title = "[B]%s[/B] - %s" % (masthead_title, name)
             if series_url:
                 #AddMenuEntry(series_title, series_url, 131, image, synopsis, '')
                 items.append({
